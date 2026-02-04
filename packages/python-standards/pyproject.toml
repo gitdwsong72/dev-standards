@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "company-python-standards"
+version = "1.0.0"
+description = "Company Python development standards (Ruff, mypy configurations)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+keywords = ["ruff", "mypy", "standards", "linting"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/company_standards"]
+
+[tool.ruff]
+extend = "src/company_standards/ruff.toml"
+
+[tool.mypy]
+strict = true
+python_version = "3.11"

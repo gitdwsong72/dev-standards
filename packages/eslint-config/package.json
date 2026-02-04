@@ -1,0 +1,33 @@
+{
+  "name": "@company/eslint-config",
+  "version": "1.0.0",
+  "description": "Company ESLint configuration for React + TypeScript projects",
+  "main": "index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./react": "./react.js"
+  },
+  "files": [
+    "index.js",
+    "react.js"
+  ],
+  "keywords": [
+    "eslint",
+    "eslintconfig",
+    "react",
+    "typescript"
+  ],
+  "peerDependencies": {
+    "eslint": ">=9.0.0",
+    "typescript": ">=5.0.0"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
+    "eslint-plugin-react": "^7.35.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^15.0.0"
+  },
+  "license": "MIT"
+}

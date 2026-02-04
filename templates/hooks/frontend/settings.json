@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolCall": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/scripts/check-env.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

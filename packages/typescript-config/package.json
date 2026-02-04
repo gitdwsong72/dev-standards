@@ -1,0 +1,19 @@
+{
+  "name": "@company/typescript-config",
+  "version": "1.0.0",
+  "description": "Company TypeScript configuration",
+  "type": "module",
+  "exports": {
+    "./base": "./base.json",
+    "./react": "./react.json"
+  },
+  "files": [
+    "base.json",
+    "react.json"
+  ],
+  "keywords": [
+    "typescript",
+    "tsconfig"
+  ],
+  "license": "MIT"
+}

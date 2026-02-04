@@ -1,0 +1,21 @@
+{
+  "name": "@company/prettier-config",
+  "version": "1.0.0",
+  "description": "Company Prettier configuration",
+  "main": "index.json",
+  "type": "module",
+  "exports": {
+    ".": "./index.json"
+  },
+  "files": [
+    "index.json"
+  ],
+  "keywords": [
+    "prettier",
+    "prettierconfig"
+  ],
+  "peerDependencies": {
+    "prettier": ">=3.0.0"
+  },
+  "license": "MIT"
+}

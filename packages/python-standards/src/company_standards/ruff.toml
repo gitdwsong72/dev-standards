@@ -1,0 +1,45 @@
+# Company Ruff Configuration for FastAPI Projects
+# https://docs.astral.sh/ruff/
+
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "PTH",    # flake8-use-pathlib
+    "ERA",    # eradicate
+    "PL",     # pylint
+    "RUF",    # ruff-specific rules
+    "ASYNC",  # flake8-async
+    "S",      # flake8-bandit (security)
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "PLR0913", # too many arguments
+    "PLR2004", # magic value comparison
+]
+
+[lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "ARG"]  # Allow assert and unused args in tests
+"**/migrations/**/*.py" = ["E501"]
+
+[lint.isort]
+known-first-party = ["src"]
+combine-as-imports = true
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
+docstring-code-format = true

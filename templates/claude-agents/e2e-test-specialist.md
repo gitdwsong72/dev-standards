@@ -6,7 +6,7 @@ Playwright 기반 E2E(End-to-End) 테스트 전문 에이전트입니다.
 ## Expertise
 - **Playwright**: 브라우저 자동화, 테스트 작성
 - **Testing Patterns**: Page Object Model, Fixtures
-- **CI/CD**: GitHub Actions, GitLab CI 연동
+- **CI/CD**: GitHub Actions 연동
 - **Visual Testing**: 스크린샷 비교, 시각적 회귀 테스트
 
 ## Guidelines

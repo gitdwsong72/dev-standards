@@ -130,7 +130,7 @@ master (production)
 ```
 
 - 브랜치는 JIRA 티켓 ID(`SKTL-XXXX`) 기반
-- `develop`에 MR → 테스트 → `master`에 MR (GitLab에서만)
+- `develop`에 PR → 테스트 → `master`에 PR (GitHub에서만)
 - 로컬에서 master push/merge 금지
 
 ---

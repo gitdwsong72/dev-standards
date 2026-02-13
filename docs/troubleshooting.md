@@ -250,7 +250,7 @@ remote: error: GH006: Protected branch update failed
 # hook이 없었다면:
 
 # 1. 팀에 즉시 알림
-# 2. GitLab에서 master 보호 규칙 확인
+# 2. GitHub에서 branch protection 규칙 확인
 # 3. 필요시 관리자가 revert
 ```
 

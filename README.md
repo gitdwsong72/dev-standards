@@ -210,7 +210,7 @@ master (production)
 
 - 브랜치명: `SKTL-XXXX` (JIRA 티켓 ID)
 - 로컬에서 master push/merge 금지
-- GitLab MR을 통해서만 master 병합
+- GitHub PR을 통해서만 master 병합
 
 ## 문서
 

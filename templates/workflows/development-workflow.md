@@ -308,7 +308,7 @@ async def test_create_sale(client: AsyncClient, sample_data: dict):
 ```
 master (production) ─────────────────────────────────►
    │                                    ▲
-   │                                    │ (GitLab MR)
+   │                                    │ (GitHub PR)
    ▼                                    │
 SKTL-XXXX (작업 브랜치) ────────────────┼────────────►
    │                                    │
@@ -319,8 +319,8 @@ develop (테스트 환경) ─────────────────�
 
 ### 워크플로우
 1. **master에서 브랜치 생성**: `git checkout -b SKTL-1234`
-2. **개발 완료 후 develop에 MR**: 테스트 환경에서 검증
-3. **테스트 완료 후 master에 MR**: GitLab에서만 (로컬 금지)
+2. **개발 완료 후 develop에 PR**: 테스트 환경에서 검증
+3. **테스트 완료 후 master에 PR**: GitHub에서만 (로컬 금지)
 
 ### 브랜치 명명
 ```bash
@@ -333,9 +333,9 @@ SKTL-5678
 
 ---
 
-## MR 가이드라인
+## PR 가이드라인
 
-### MR 템플릿
+### PR 템플릿
 ```markdown
 ## 변경 사항
 - 주요 변경 내용 요약

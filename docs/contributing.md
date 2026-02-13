@@ -199,7 +199,7 @@ ls -la /tmp/test-fs/
 
 ### 문서 확인
 
-- Markdown 렌더링 확인 (GitLab/GitHub Preview)
+- Markdown 렌더링 확인 (GitHub Preview)
 - 링크 깨짐 확인
 - 코드 블록 문법 확인
 
@@ -268,7 +268,7 @@ uv publish --index-url https://your-registry.com
 
 ### 리뷰 프로세스
 
-1. MR(Merge Request) 생성
+1. PR(Pull Request) 생성
 2. 최소 1명 이상의 팀원 리뷰
 3. CI 통과 확인
 4. 리뷰 승인 후 병합

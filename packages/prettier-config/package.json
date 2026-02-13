@@ -14,6 +14,19 @@
     "prettier",
     "prettierconfig"
   ],
+  "author": "Company Dev Team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/company/dev-standards.git",
+    "directory": "packages/prettier-config"
+  },
+  "bugs": {
+    "url": "https://github.com/company/dev-standards/issues"
+  },
+  "homepage": "https://github.com/company/dev-standards/tree/master/packages/prettier-config#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "peerDependencies": {
     "prettier": ">=3.0.0"
   },

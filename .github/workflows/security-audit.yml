@@ -1,0 +1,60 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1' # 매주 월요일
+
+jobs:
+  npm-audit:
+    name: NPM Audit - ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          - eslint-config
+          - prettier-config
+          - typescript-config
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        working-directory: packages/${{ matrix.package }}
+        run: pnpm install
+
+      - name: Run npm audit
+        working-directory: packages/${{ matrix.package }}
+        run: pnpm audit --audit-level=moderate
+
+  python-audit:
+    name: Python Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        working-directory: packages/python-standards
+        run: uv pip install --system -e .
+
+      - name: Run pip-audit
+        run: |
+          uv pip install --system pip-audit
+          pip-audit --strict --desc

@@ -9,6 +9,7 @@ __pycache__/
 dist/
 build/
 .venv/
+venv/
 
 # IDE
 .idea/
@@ -23,6 +24,69 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 
 # Misc
 *.local
+
+# ========================================
+# 민감정보 보호
+# ========================================
+
+# 환경 변수
+.env
+.env.*
+!.env.example
+
+# 인증서 및 키 파일
+*.key
+*.pem
+*.cert
+*.crt
+*.csr
+*.p12
+*.pfx
+*.jks
+
+# 민감 디렉토리
+credentials/
+secrets/
+.secrets/
+private/
+
+# AWS
+.aws/
+aws-exports.js
+aws-exports.ts
+
+# GCP / Firebase
+*-firebase-adminsdk-*.json
+service-account*.json
+.gcp/
+
+# Docker 환경
+.docker/config.json
+
+# 데이터베이스
+*.sql
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+
+# SSH
+.ssh/
+id_rsa
+id_ed25519
+
+# 토큰 및 인증 파일
+.npmrc
+.pypirc
+.netrc
+.htpasswd
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/

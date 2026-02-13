@@ -1,0 +1,228 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main, develop]
+  pull_request:
+    branches: [master, main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-packages:
+    name: Lint - ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - eslint-config
+          - prettier-config
+          - typescript-config
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-${{ matrix.package }}-${{ hashFiles(format('packages/{0}/package.json', matrix.package)) }}
+          restore-keys: |
+            pnpm-${{ matrix.package }}-
+
+      - name: Install dependencies
+        working-directory: packages/${{ matrix.package }}
+        run: pnpm install
+
+      - name: Validate package.json
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const required = ['name', 'version', 'description', 'license'];
+            const missing = required.filter(f => !pkg[f]);
+            if (missing.length) {
+              console.error('Missing fields:', missing.join(', '));
+              process.exit(1);
+            }
+            console.log('Package validation passed:', pkg.name, pkg.version);
+          "
+
+      - name: Check exports resolve
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const fs = require('fs');
+            const exports = pkg.exports || {};
+            for (const [key, value] of Object.entries(exports)) {
+              const file = typeof value === 'string' ? value : value.default || value.import || value.require;
+              if (file && !fs.existsSync(file)) {
+                console.error('Export not found:', key, '->', file);
+                process.exit(1);
+              }
+              console.log('Export OK:', key, '->', file);
+            }
+          "
+
+  test-python:
+    name: Python Standards
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ matrix.python-version }}-${{ hashFiles('packages/python-standards/pyproject.toml') }}
+          restore-keys: |
+            uv-${{ matrix.python-version }}-
+
+      - name: Install package
+        working-directory: packages/python-standards
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Ruff lint
+        working-directory: packages/python-standards
+        run: ruff check src/
+
+      - name: Ruff format check
+        working-directory: packages/python-standards
+        run: ruff format --check src/
+
+      - name: Mypy type check
+        working-directory: packages/python-standards
+        run: mypy src/ --ignore-missing-imports
+
+      - name: Validate ruff.toml
+        working-directory: packages/python-standards
+        run: |
+          python -c "
+          import tomllib
+          from pathlib import Path
+          config = tomllib.loads(Path('src/company_standards/ruff.toml').read_text())
+          print('Ruff config validated:', list(config.keys()))
+          "
+
+  test-create-script:
+    name: Create Script Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check script syntax
+        run: bash -n scripts/create-project.sh
+
+      - name: Check script is executable
+        run: |
+          if [ ! -x scripts/create-project.sh ]; then
+            echo "Script is not executable, checking if it would be after chmod"
+            chmod +x scripts/create-project.sh
+          fi
+
+      - name: Test help flag
+        run: |
+          chmod +x scripts/create-project.sh
+          ./scripts/create-project.sh --help
+
+      - name: Test invalid input rejection
+        run: |
+          chmod +x scripts/create-project.sh
+          # Should fail with invalid project name
+          if ./scripts/create-project.sh --name "../escape" --type frontend 2>/dev/null; then
+            echo "FAIL: Should have rejected path traversal"
+            exit 1
+          fi
+          echo "PASS: Path traversal rejected"
+
+          # Should fail with invalid type
+          if ./scripts/create-project.sh --name testproject --type invalid 2>/dev/null; then
+            echo "FAIL: Should have rejected invalid type"
+            exit 1
+          fi
+          echo "PASS: Invalid type rejected"
+
+  template-validation:
+    name: Validate Templates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check template files exist
+        run: |
+          templates=(
+            "templates/claude-agents/react-specialist.md"
+            "templates/claude-agents/fastapi-specialist.md"
+            "templates/claude-agents/e2e-test-specialist.md"
+            "templates/claude-agents/sql-query-specialist.md"
+            "templates/claude-agents/api-test-specialist.md"
+            "templates/claude-agents/code-quality-reviewer.md"
+          )
+          missing=0
+          for t in "${templates[@]}"; do
+            if [ ! -f "$t" ]; then
+              echo "MISSING: $t"
+              missing=1
+            else
+              echo "OK: $t"
+            fi
+          done
+          if [ $missing -eq 1 ]; then
+            exit 1
+          fi
+
+      - name: Check markdown syntax
+        run: |
+          for f in templates/**/*.md; do
+            if [ -f "$f" ]; then
+              # Check for non-empty files
+              if [ ! -s "$f" ]; then
+                echo "EMPTY: $f"
+                exit 1
+              fi
+              echo "OK: $f ($(wc -l < "$f") lines)"
+            fi
+          done
+
+  ci-status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    needs: [lint-packages, test-python, test-create-script, template-validation]
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.lint-packages.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-python.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-create-script.result }}" == "failure" ]] || \
+             [[ "${{ needs.template-validation.result }}" == "failure" ]]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi
+          echo "All CI checks passed"

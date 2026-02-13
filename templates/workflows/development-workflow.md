@@ -72,19 +72,51 @@
 ### 목적
 명확한 요구사항 문서화로 구현 품질을 보장합니다.
 
-### 템플릿 활용
-```bash
-# 새 화면 PRD 작성 시
-/prd-screen
+### PRD 파일 생성 절차
 
-# 공통 PRD 참조
-docs/prd/common.md
-```
+1. **인덱스에 등록** — `docs/prd/index.md`에 새 항목 추가
+2. **템플릿 복사** — 적절한 템플릿을 복사하여 PRD 파일 생성
+   ```bash
+   # 화면 PRD
+   cp docs/prd/screens/_template.md docs/prd/screens/{화면명}.md
+
+   # API 엔드포인트 PRD
+   cp docs/prd/endpoints/_template.md docs/prd/endpoints/{도메인명}.md
+   ```
+3. **내용 작성** — 템플릿의 각 섹션을 채워 넣기
+4. **인덱스 상태 업데이트** — 작성 완료 시 인덱스 상태를 `Review`로 변경
+
+### 화면 PRD vs API PRD 선택 기준
+
+| 구분 | 화면 PRD (`screen.md`) | API PRD (`endpoint.md`) |
+|------|----------------------|------------------------|
+| 대상 | Frontend 화면/페이지 | Backend API 엔드포인트 |
+| 초점 | UI 레이아웃, 사용자 인터랙션, 상태 관리 | 데이터 모델, Request/Response, 비즈니스 규칙 |
+| 사용 시점 | 새 화면 개발 시 | 새 API 개발 시 |
+| Fullstack | 하나의 기능에 화면 PRD + API PRD 모두 작성 권장 | |
 
 ### PRD 작성 원칙
 1. **명확성**: 모호한 표현 지양
 2. **완전성**: 모든 케이스 기술
 3. **검증가능성**: 테스트 가능한 기준 제시
+
+### PRD → Agent/Team 전달
+
+PRD 작성 후 Agent 또는 Team에게 PRD 파일 경로를 전달하여 구현을 요청합니다.
+
+```bash
+# 화면 PRD 기반 Frontend 구현
+@react-specialist docs/prd/screens/sales-list.md 기반으로 매출 목록 구현
+
+# API PRD 기반 Backend 구현
+@fastapi-specialist docs/prd/endpoints/sales.md 기반으로 매출 API 구현
+
+# SQL 쿼리 작성
+@sql-query-specialist docs/prd/endpoints/sales.md 기반으로 SQL 작성
+
+# Fullstack Team에 PRD 전체 전달
+@fullstack-team docs/prd/ 참조하여 매출 기능 전체 구현
+```
 
 ---
 
@@ -359,3 +391,46 @@ SKTL-5678
 /component-review [파일 경로]
 /query-review [파일 경로]
 ```
+
+---
+
+## Team 활용 (병렬 개발)
+
+### 단일 에이전트 vs Team
+
+| 비교 항목 | 단일 Agent | Fullstack Team |
+|-----------|-----------|----------------|
+| **적합한 작업** | 단일 파일/레이어 수정, 버그 수정 | Fullstack 기능 개발 (Backend + Frontend) |
+| **실행 방식** | 순차 실행 | Phase별 병렬 실행 |
+| **Agent 수** | 1개 | Team Lead + 최대 5개 |
+| **소통 구조** | 사용자 ↔ Agent | 사용자 ↔ Team Lead ↔ Teammates |
+| **API 사용량** | 낮음 | 높음 (병렬 실행) |
+
+### 선택 기준
+- **단일 Agent**: 하나의 레이어(Backend만 또는 Frontend만) 작업
+- **Team**: Backend + Frontend + Test를 동시에 구현해야 하는 경우
+
+### Team 사용 시나리오 예시
+
+```bash
+# Fullstack 기능 개발
+@fullstack-team 매출 목록 페이지 구현
+
+# 상세 요청
+@fullstack-team 매출 관리 기능 구현
+- 목록 조회: 검색, 필터링, 정렬, 페이지네이션
+- CRUD: 등록/수정/삭제
+- AG-Grid 테이블
+- 기존 패턴 참조: src/domains/orders/
+```
+
+### Team 작업 흐름
+```
+Phase 0: 분석 & 계획 (Team Lead)
+Phase 1: Backend + SQL (병렬) → sql-dev, backend-dev
+Phase 2: Frontend + Test (병렬) → frontend-dev, api-tester
+Phase 3: 코드 리뷰 → reviewer
+Phase 4: 최종 확인 (Team Lead)
+```
+
+자세한 사용법은 [Fullstack Team Guide](fullstack-team-guide.md) 참조

@@ -18,6 +18,19 @@
     "react",
     "typescript"
   ],
+  "author": "Company Dev Team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/company/dev-standards.git",
+    "directory": "packages/eslint-config"
+  },
+  "bugs": {
+    "url": "https://github.com/company/dev-standards/issues"
+  },
+  "homepage": "https://github.com/company/dev-standards/tree/master/packages/eslint-config#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "peerDependencies": {
     "eslint": ">=9.0.0",
     "typescript": ">=5.0.0"
@@ -27,6 +40,8 @@
     "typescript-eslint": "^8.0.0",
     "eslint-plugin-react": "^7.35.0",
     "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-import-x": "^4.0.0",
+    "eslint-plugin-security": "^3.0.0",
     "globals": "^15.0.0"
   },
   "license": "MIT"

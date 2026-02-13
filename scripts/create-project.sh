@@ -139,11 +139,15 @@ interactive_input() {
 
     # 프로젝트 이름
     if [ -z "$PROJECT_NAME" ]; then
-        echo -e "${YELLOW}프로젝트 이름을 입력하세요:${NC}"
+        echo -e "${YELLOW}프로젝트 이름을 입력하세요 (영문자, 숫자, 하이픈, 언더스코어):${NC}"
         read -p "> " PROJECT_NAME
 
         if [ -z "$PROJECT_NAME" ]; then
             print_error "프로젝트 이름은 필수입니다."
+            exit 1
+        fi
+
+        if ! validate_project_name "$PROJECT_NAME"; then
             exit 1
         fi
     fi
@@ -173,6 +177,9 @@ interactive_input() {
         echo -e "${YELLOW}Frontend 디렉토리 이름 (기본: ${PROJECT_NAME}-frontend):${NC}"
         read -p "> " custom_frontend
         if [ -n "$custom_frontend" ]; then
+            if ! validate_dir_name "$custom_frontend" "Frontend"; then
+                exit 1
+            fi
             FRONTEND_DIR="$custom_frontend"
         fi
 
@@ -180,6 +187,9 @@ interactive_input() {
         echo -e "${YELLOW}Backend 디렉토리 이름 (기본: ${PROJECT_NAME}-backend):${NC}"
         read -p "> " custom_backend
         if [ -n "$custom_backend" ]; then
+            if ! validate_dir_name "$custom_backend" "Backend"; then
+                exit 1
+            fi
             BACKEND_DIR="$custom_backend"
         fi
     fi
@@ -190,8 +200,100 @@ interactive_input() {
     read -p "> " custom_dir
 
     if [ -n "$custom_dir" ]; then
+        if ! validate_path "$custom_dir"; then
+            exit 1
+        fi
         TARGET_DIR="$custom_dir"
     fi
+}
+
+#######################################
+# 입력 검증 (보안)
+#######################################
+
+validate_project_name() {
+    local name="$1"
+
+    # 빈 값 체크
+    if [ -z "$name" ]; then
+        print_error "프로젝트명이 비어있습니다."
+        return 1
+    fi
+
+    # 영문자, 숫자, 하이픈, 언더스코어만 허용 (command injection 방지)
+    if ! [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        print_error "프로젝트명은 영문자, 숫자, 하이픈(-), 언더스코어(_)만 사용 가능합니다."
+        return 1
+    fi
+
+    # 영문자로 시작해야 함
+    if ! [[ "$name" =~ ^[a-zA-Z] ]]; then
+        print_error "프로젝트명은 영문자로 시작해야 합니다."
+        return 1
+    fi
+
+    # 길이 제한 (1~50자)
+    if [ ${#name} -gt 50 ]; then
+        print_error "프로젝트명은 최대 50자까지 가능합니다."
+        return 1
+    fi
+
+    # 예약어 차단
+    local reserved_names=("test" "." ".." "node_modules" "dist" "build" "src" "tmp" "temp" "root" "admin")
+    for reserved in "${reserved_names[@]}"; do
+        if [ "$name" = "$reserved" ]; then
+            print_error "예약어는 프로젝트명으로 사용할 수 없습니다: $reserved"
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+validate_path() {
+    local path="$1"
+
+    # 빈 값 체크
+    if [ -z "$path" ]; then
+        print_error "경로가 비어있습니다."
+        return 1
+    fi
+
+    # 경로 탐색 공격 방지 (..)
+    if [[ "$path" == *".."* ]]; then
+        print_error "경로에 '..'를 포함할 수 없습니다."
+        return 1
+    fi
+
+    # 위험 문자 차단 (command injection 방지)
+    if [[ "$path" =~ [';|&$`\\'] ]]; then
+        print_error "경로에 특수문자를 사용할 수 없습니다."
+        return 1
+    fi
+
+    return 0
+}
+
+validate_dir_name() {
+    local name="$1"
+    local label="$2"
+
+    if [ -z "$name" ]; then
+        return 0  # 빈 값은 기본값 사용
+    fi
+
+    # 영문자, 숫자, 하이픈, 언더스코어만 허용
+    if ! [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        print_error "${label} 디렉토리명은 영문자, 숫자, 하이픈(-), 언더스코어(_)만 사용 가능합니다."
+        return 1
+    fi
+
+    if [ ${#name} -gt 50 ]; then
+        print_error "${label} 디렉토리명은 최대 50자까지 가능합니다."
+        return 1
+    fi
+
+    return 0
 }
 
 #######################################
@@ -244,9 +346,14 @@ check_prerequisites() {
 }
 
 validate_inputs() {
-    # 프로젝트 이름 검증
+    # 프로젝트 이름 입력 (대화형)
     if [ -z "$PROJECT_NAME" ]; then
         interactive_input
+    fi
+
+    # 프로젝트 이름 보안 검증
+    if ! validate_project_name "$PROJECT_NAME"; then
+        exit 1
     fi
 
     # 프로젝트 타입 검증
@@ -259,14 +366,137 @@ validate_inputs() {
             ;;
     esac
 
-    # 대상 디렉토리 검증
+    # 대상 디렉토리 경로 보안 검증
+    if ! validate_path "$TARGET_DIR"; then
+        exit 1
+    fi
+
+    # 대상 디렉토리 존재 여부 검증
     if [ ! -d "$TARGET_DIR" ]; then
         print_error "대상 디렉토리가 존재하지 않습니다: $TARGET_DIR"
         exit 1
     fi
 
+    # Fullstack 디렉토리 이름 검증
+    if [ -n "$FRONTEND_DIR" ]; then
+        if ! validate_dir_name "$FRONTEND_DIR" "Frontend"; then
+            exit 1
+        fi
+    fi
+    if [ -n "$BACKEND_DIR" ]; then
+        if ! validate_dir_name "$BACKEND_DIR" "Backend"; then
+            exit 1
+        fi
+    fi
+
     # 필수 도구 체크
     check_prerequisites
+}
+
+#######################################
+# Commitlint + Husky 설정
+#######################################
+
+setup_commitlint() {
+    local project_path="$1"
+    local pkg_manager="$2"  # "pnpm" 또는 "uv" (frontend/backend 구분)
+
+    print_step "Commitlint + Husky 설정..."
+
+    cd "$project_path"
+
+    if [ "$pkg_manager" == "pnpm" ]; then
+        # Frontend (Node.js) 프로젝트
+        # commitlint 설정 파일 복사
+        if [ -f "$STANDARDS_PATH/templates/git/commitlint.config.js" ]; then
+            cp "$STANDARDS_PATH/templates/git/commitlint.config.js" commitlint.config.js
+        fi
+
+        # package.json에 commitlint, husky devDependencies 추가
+        # (실제 install은 사용자가 pnpm install 시 수행)
+        local tmp_pkg
+        tmp_pkg=$(mktemp)
+        node -e "
+const pkg = require('./package.json');
+pkg.devDependencies = pkg.devDependencies || {};
+pkg.devDependencies['@commitlint/cli'] = '^19.0.0';
+pkg.devDependencies['@commitlint/config-conventional'] = '^19.0.0';
+pkg.devDependencies['husky'] = '^9.0.0';
+pkg.scripts = pkg.scripts || {};
+pkg.scripts['prepare'] = 'husky';
+console.log(JSON.stringify(pkg, null, 2));
+" > "$tmp_pkg" 2>/dev/null
+
+        if [ -s "$tmp_pkg" ]; then
+            mv "$tmp_pkg" package.json
+        else
+            rm -f "$tmp_pkg"
+            print_warning "package.json 업데이트 실패 (node 필요). 수동으로 추가하세요."
+            return
+        fi
+
+        # husky 디렉토리 및 commit-msg hook 생성
+        mkdir -p .husky
+        if [ -f "$STANDARDS_PATH/templates/git/commit-msg-hook.sh" ]; then
+            cp "$STANDARDS_PATH/templates/git/commit-msg-hook.sh" .husky/commit-msg
+        else
+            cat > .husky/commit-msg << 'HOOK'
+#!/bin/sh
+npx --no -- commitlint --edit "$1"
+HOOK
+        fi
+        chmod +x .husky/commit-msg
+
+        print_success "Commitlint + Husky 설정 완료"
+        echo "  → pnpm install 후 자동으로 husky가 초기화됩니다."
+
+    elif [ "$pkg_manager" == "uv" ]; then
+        # Backend (Python) 프로젝트 - commitlint은 Node.js 기반이므로 npx 사용
+        # commitlint 설정 파일 복사
+        if [ -f "$STANDARDS_PATH/templates/git/commitlint.config.js" ]; then
+            cp "$STANDARDS_PATH/templates/git/commitlint.config.js" commitlint.config.js
+        fi
+
+        # pre-commit 또는 직접 git hook으로 설정
+        mkdir -p .githooks
+        if [ -f "$STANDARDS_PATH/templates/git/commit-msg-hook.sh" ]; then
+            cp "$STANDARDS_PATH/templates/git/commit-msg-hook.sh" .githooks/commit-msg
+        else
+            cat > .githooks/commit-msg << 'HOOK'
+#!/bin/sh
+npx --no -- commitlint --edit "$1"
+HOOK
+        fi
+        chmod +x .githooks/commit-msg
+
+        # setup script 생성
+        cat > scripts/setup-commitlint.sh << 'SETUP'
+#!/bin/bash
+# Commitlint 설정 스크립트 (Backend 프로젝트용)
+#
+# Node.js가 설치되어 있어야 합니다.
+# 이 스크립트는 최초 1회만 실행하면 됩니다.
+
+set -e
+
+echo "Commitlint 설정 중..."
+
+# git hooks 경로 설정
+git config core.hooksPath .githooks
+
+# commitlint 설치 (npx로 실행하므로 전역 설치 불필요)
+# 로컬에 캐시하려면 아래 주석 해제:
+# npm install --save-dev @commitlint/cli @commitlint/config-conventional
+
+echo "✓ Commitlint 설정 완료"
+echo "  → git hooks 경로: .githooks/"
+echo "  → 커밋 시 자동으로 메시지가 검증됩니다."
+SETUP
+        chmod +x scripts/setup-commitlint.sh
+
+        print_success "Commitlint 설정 완료"
+        echo "  → scripts/setup-commitlint.sh 실행 후 커밋 메시지 검증이 활성화됩니다."
+    fi
 }
 
 #######################################
@@ -626,6 +856,14 @@ services:
       - VITE_API_URL=http://localhost:8000
 EOF
 
+    # PRD 템플릿 복사
+    print_step "PRD 템플릿 복사..."
+    if [ -d "$STANDARDS_PATH/templates/prd" ]; then
+        cp "$STANDARDS_PATH/templates/prd/common.md" docs/prd/common/ 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/prd/screen.md" docs/prd/screens/_template.md 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/prd/index.md" docs/prd/ 2>/dev/null || true
+    fi
+
     # Claude 설정 복사
     print_step "Claude Code 설정 복사..."
     if [ -d "$STANDARDS_PATH/templates/claude-agents" ]; then
@@ -767,6 +1005,9 @@ pnpm dev
 - [커밋 컨벤션](docs/standards/commit-convention.md)
 - [개발 워크플로우](docs/standards/development-workflow.md)
 EOF
+
+    # Commitlint + Husky 설정
+    setup_commitlint "$project_path" "pnpm"
 
     print_success "Frontend 프로젝트 생성 완료: $project_path"
 }
@@ -1235,6 +1476,14 @@ volumes:
   postgres_data:
 EOF
 
+    # PRD 템플릿 복사
+    print_step "PRD 템플릿 복사..."
+    if [ -d "$STANDARDS_PATH/templates/prd" ]; then
+        cp "$STANDARDS_PATH/templates/prd/common.md" docs/prd/common/ 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/prd/endpoint.md" docs/prd/endpoints/_template.md 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/prd/index.md" docs/prd/ 2>/dev/null || true
+    fi
+
     # Claude 설정 복사
     print_step "Claude Code 설정 복사..."
     if [ -d "$STANDARDS_PATH/templates/claude-agents" ]; then
@@ -1247,6 +1496,41 @@ EOF
     if [ -d "$STANDARDS_PATH/templates/hooks/backend" ]; then
         cp "$STANDARDS_PATH/templates/hooks/backend/check-env.sh" .claude/scripts/ 2>/dev/null || true
         chmod +x .claude/scripts/check-env.sh 2>/dev/null || true
+    fi
+
+    # API 응답 포맷 템플릿 복사
+    print_step "API 응답 포맷 템플릿 복사..."
+    if [ -d "$STANDARDS_PATH/templates/backend" ]; then
+        mkdir -p src/shared/response
+        cp "$STANDARDS_PATH/templates/backend/response_schemas.py" src/shared/response/ 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/backend/response_utils.py" src/shared/response/ 2>/dev/null || true
+        touch src/shared/response/__init__.py
+        cat > src/shared/response/__init__.py << 'EOF'
+"""API 응답 포맷 유틸리티."""
+
+from .response_schemas import (
+    ErrorDetail,
+    ErrorInfo,
+    ErrorResponse,
+    PaginatedData,
+    PaginationInfo,
+    ResponseMeta,
+    SuccessResponse,
+)
+from .response_utils import error_response, success_response
+
+__all__ = [
+    "ErrorDetail",
+    "ErrorInfo",
+    "ErrorResponse",
+    "PaginatedData",
+    "PaginationInfo",
+    "ResponseMeta",
+    "SuccessResponse",
+    "error_response",
+    "success_response",
+]
+EOF
     fi
 
     # 개발 표준 문서 복사
@@ -1396,6 +1680,9 @@ uvicorn src.main:app --reload --port 8000
 - [개발 워크플로우](docs/standards/development-workflow.md)
 EOF
 
+    # Commitlint 설정
+    setup_commitlint "$project_path" "uv"
+
     print_success "Backend 프로젝트 생성 완료: $project_path"
 }
 
@@ -1482,6 +1769,64 @@ volumes:
   postgres_data:
 EOF
 
+    # Fullstack Team 설정: 모든 Agent + Team 템플릿을 양쪽에 복사
+    print_step "Fullstack Team 템플릿 설정..."
+    if [ -d "$STANDARDS_PATH/templates/claude-agents" ]; then
+        # Frontend에 Backend Agent 추가
+        cp "$STANDARDS_PATH/templates/claude-agents/fastapi-specialist.md" "$base_path/$frontend_dir/.claude/agents/" 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/claude-agents/sql-query-specialist.md" "$base_path/$frontend_dir/.claude/agents/" 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/claude-agents/api-test-specialist.md" "$base_path/$frontend_dir/.claude/agents/" 2>/dev/null || true
+
+        # Backend에 Frontend Agent 추가
+        cp "$STANDARDS_PATH/templates/claude-agents/react-specialist.md" "$base_path/$backend_dir/.claude/agents/" 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/claude-agents/e2e-test-specialist.md" "$base_path/$backend_dir/.claude/agents/" 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/claude-agents/code-quality-reviewer.md" "$base_path/$backend_dir/.claude/agents/" 2>/dev/null || true
+    fi
+
+    # Team Lead 템플릿을 양쪽에 복사
+    if [ -d "$STANDARDS_PATH/templates/claude-teams" ]; then
+        cp "$STANDARDS_PATH/templates/claude-teams/fullstack-team.md" "$base_path/$frontend_dir/.claude/agents/" 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/claude-teams/fullstack-team.md" "$base_path/$backend_dir/.claude/agents/" 2>/dev/null || true
+    fi
+
+    # Fullstack Team 가이드 복사
+    if [ -d "$STANDARDS_PATH/templates/workflows" ]; then
+        cp "$STANDARDS_PATH/templates/workflows/fullstack-team-guide.md" "$base_path/$frontend_dir/docs/standards/" 2>/dev/null || true
+        cp "$STANDARDS_PATH/templates/workflows/fullstack-team-guide.md" "$base_path/$backend_dir/docs/standards/" 2>/dev/null || true
+    fi
+
+    print_success "Team 템플릿 설정 완료 (양쪽 프로젝트에 전체 Agent + Team Lead 복사)"
+
+    # Frontend CLAUDE.md에 Team 정보 추가
+    cat >> "$base_path/$frontend_dir/CLAUDE.md" << 'EOF'
+
+## Claude Code Team
+
+- `@fullstack-team` - Fullstack 기능 병렬 개발 (Backend + Frontend + Test + Review)
+
+### Team 사용 예시
+```bash
+@fullstack-team 매출 목록 페이지 구현
+```
+
+자세한 사용법은 [Fullstack Team Guide](docs/standards/fullstack-team-guide.md) 참조
+EOF
+
+    # Backend CLAUDE.md에 Team 정보 추가
+    cat >> "$base_path/$backend_dir/CLAUDE.md" << 'EOF'
+
+## Claude Code Team
+
+- `@fullstack-team` - Fullstack 기능 병렬 개발 (Backend + Frontend + Test + Review)
+
+### Team 사용 예시
+```bash
+@fullstack-team 매출 목록 페이지 구현
+```
+
+자세한 사용법은 [Fullstack Team Guide](docs/standards/fullstack-team-guide.md) 참조
+EOF
+
     # 루트 README.md 생성
     cat > "$base_path/README.md" << EOF
 # $project_name
@@ -1520,6 +1865,14 @@ python -m venv .venv
 source .venv/bin/activate
 uv pip install -e ".[dev]"
 uvicorn src.main:app --reload --port 8000
+\`\`\`
+
+## Claude Code Team
+
+Fullstack 기능을 병렬로 개발하려면:
+\`\`\`bash
+# Frontend 또는 Backend 디렉토리에서
+@fullstack-team 매출 목록 페이지 구현
 \`\`\`
 
 ## 접속 URL

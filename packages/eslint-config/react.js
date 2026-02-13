@@ -42,6 +42,11 @@ export default [
       // React Hooks
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
+
+      // React Security
+      'react/jsx-no-script-url': 'error',
+      'react/jsx-no-target-blank': 'error',
+      'react/no-danger': 'warn',
     },
   },
 ];

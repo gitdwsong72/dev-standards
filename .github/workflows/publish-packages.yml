@@ -1,0 +1,206 @@
+name: Publish Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to publish'
+        required: true
+        type: choice
+        options:
+          - all
+          - eslint-config
+          - prettier-config
+          - typescript-config
+          - python-standards
+      dry_run:
+        description: 'Dry run (no actual publish)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  detect-changes:
+    name: Detect Changed Packages
+    runs-on: ubuntu-latest
+    outputs:
+      eslint-config: ${{ steps.changes.outputs.eslint-config }}
+      prettier-config: ${{ steps.changes.outputs.prettier-config }}
+      typescript-config: ${{ steps.changes.outputs.typescript-config }}
+      python-standards: ${{ steps.changes.outputs.python-standards }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: changes
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            INPUT="${{ github.event.inputs.package }}"
+            echo "eslint-config=$([[ "$INPUT" == "all" || "$INPUT" == "eslint-config" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "prettier-config=$([[ "$INPUT" == "all" || "$INPUT" == "prettier-config" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "typescript-config=$([[ "$INPUT" == "all" || "$INPUT" == "typescript-config" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "python-standards=$([[ "$INPUT" == "all" || "$INPUT" == "python-standards" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          else
+            # Tag-based: check which packages changed since last tag
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+            if [ -z "$PREV_TAG" ]; then
+              echo "eslint-config=true" >> $GITHUB_OUTPUT
+              echo "prettier-config=true" >> $GITHUB_OUTPUT
+              echo "typescript-config=true" >> $GITHUB_OUTPUT
+              echo "python-standards=true" >> $GITHUB_OUTPUT
+            else
+              echo "eslint-config=$(git diff --name-only $PREV_TAG HEAD -- packages/eslint-config/ | grep -q . && echo true || echo false)" >> $GITHUB_OUTPUT
+              echo "prettier-config=$(git diff --name-only $PREV_TAG HEAD -- packages/prettier-config/ | grep -q . && echo true || echo false)" >> $GITHUB_OUTPUT
+              echo "typescript-config=$(git diff --name-only $PREV_TAG HEAD -- packages/typescript-config/ | grep -q . && echo true || echo false)" >> $GITHUB_OUTPUT
+              echo "python-standards=$(git diff --name-only $PREV_TAG HEAD -- packages/python-standards/ | grep -q . && echo true || echo false)" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+  publish-npm:
+    name: Publish ${{ matrix.package }} to npm
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.eslint-config == 'true' ||
+      needs.detect-changes.outputs.prettier-config == 'true' ||
+      needs.detect-changes.outputs.typescript-config == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: eslint-config
+            condition: eslint-config
+          - package: prettier-config
+            condition: prettier-config
+          - package: typescript-config
+            condition: typescript-config
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check if should publish
+        id: should-publish
+        run: |
+          CONDITION="${{ needs.detect-changes.outputs[matrix.condition] }}"
+          echo "publish=$CONDITION" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v4
+        if: steps.should-publish.outputs.publish == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.should-publish.outputs.publish == 'true'
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install pnpm
+        if: steps.should-publish.outputs.publish == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        if: steps.should-publish.outputs.publish == 'true'
+        working-directory: packages/${{ matrix.package }}
+        run: pnpm install
+
+      - name: Check version not published
+        if: steps.should-publish.outputs.publish == 'true'
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view "$PKG_NAME@$PKG_VERSION" version 2>/dev/null || echo "")
+          if [ "$PUBLISHED" == "$PKG_VERSION" ]; then
+            echo "Version $PKG_VERSION already published, skipping"
+            echo "SKIP=true" >> $GITHUB_ENV
+          else
+            echo "Publishing $PKG_NAME@$PKG_VERSION"
+            echo "SKIP=false" >> $GITHUB_ENV
+          fi
+
+      - name: Publish (dry run)
+        if: |
+          steps.should-publish.outputs.publish == 'true' &&
+          env.SKIP != 'true' &&
+          (github.event.inputs.dry_run == 'true' || github.event.inputs.dry_run == '')
+        working-directory: packages/${{ matrix.package }}
+        run: pnpm publish --dry-run --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish
+        if: |
+          steps.should-publish.outputs.publish == 'true' &&
+          env.SKIP != 'true' &&
+          github.event.inputs.dry_run != 'true' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        working-directory: packages/${{ matrix.package }}
+        run: pnpm publish --no-git-checks --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-pypi:
+    name: Publish Python Standards to PyPI
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.python-standards == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install build tools
+        run: uv pip install --system build twine
+
+      - name: Build package
+        working-directory: packages/python-standards
+        run: python -m build
+
+      - name: Check package
+        working-directory: packages/python-standards
+        run: twine check dist/*
+
+      - name: Publish (dry run)
+        if: github.event.inputs.dry_run == 'true'
+        working-directory: packages/python-standards
+        run: |
+          echo "Dry run - would publish:"
+          ls -la dist/
+
+      - name: Publish to PyPI
+        if: |
+          github.event.inputs.dry_run != 'true' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        working-directory: packages/python-standards
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/python-standards/dist/
+          password: ${{ secrets.PYPI_TOKEN }}
+
+  publish-status:
+    name: Publish Status
+    runs-on: ubuntu-latest
+    needs: [publish-npm, publish-pypi]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## Publish Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Package | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| npm packages | ${{ needs.publish-npm.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Standards | ${{ needs.publish-pypi.result }} |" >> $GITHUB_STEP_SUMMARY

@@ -14,6 +14,7 @@ dev-standards/
 │   └── python-standards/       # company-python-standards (pip)
 ├── templates/
 │   ├── claude-agents/          # Agent 템플릿
+│   ├── claude-teams/           # Team 템플릿
 │   ├── prd/                    # PRD 템플릿
 │   ├── hooks/                  # Claude Hooks 템플릿
 │   └── workflows/              # 워크플로우 문서
@@ -107,6 +108,44 @@ cp templates/claude-agents/fastapi-specialist.md ../backend/.claude/agents/
 cp templates/claude-agents/sql-query-specialist.md ../backend/.claude/agents/
 cp templates/claude-agents/api-test-specialist.md ../backend/.claude/agents/
 ```
+
+## Claude Code Team 가이드
+
+### Fullstack Team
+여러 전문 에이전트가 병렬로 작업하는 팀 구성 템플릿입니다.
+
+| Team | 구성 | 역할 |
+|------|-----|------|
+| `fullstack-team` | Lead + 5 specialists | Fullstack 기능 병렬 개발 |
+
+**팀 구성:**
+| Teammate | Agent 기반 | 역할 |
+|----------|-----------|------|
+| `backend-dev` | fastapi-specialist | API 엔드포인트 구현 |
+| `sql-dev` | sql-query-specialist | SQL 쿼리 작성 |
+| `frontend-dev` | react-specialist | React UI 구현 |
+| `api-tester` | api-test-specialist | API 테스트 작성 |
+| `reviewer` | code-quality-reviewer | 코드 품질/보안 리뷰 |
+
+### Team 템플릿 복사 방법
+```bash
+# Team Lead 템플릿
+cp templates/claude-teams/fullstack-team.md ../your-project/.claude/agents/
+
+# Agent 템플릿 (필요한 것만 선택)
+cp templates/claude-agents/fastapi-specialist.md ../your-project/.claude/agents/
+cp templates/claude-agents/sql-query-specialist.md ../your-project/.claude/agents/
+cp templates/claude-agents/react-specialist.md ../your-project/.claude/agents/
+cp templates/claude-agents/api-test-specialist.md ../your-project/.claude/agents/
+cp templates/claude-agents/code-quality-reviewer.md ../your-project/.claude/agents/
+```
+
+### 사용 예시
+```bash
+@fullstack-team 매출 목록 페이지 구현
+```
+
+자세한 내용은 `templates/workflows/fullstack-team-guide.md` 참조
 
 ## 워크플로우
 

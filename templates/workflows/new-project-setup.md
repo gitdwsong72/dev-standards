@@ -465,6 +465,54 @@ DB_REPLICA_DB_URL=
 
 ---
 
+## 3-1. Fullstack Team 설정
+
+Fullstack 프로젝트에서 Agent Team을 사용하려면 추가 설정이 필요합니다.
+
+> **참고**: `create-project.sh --type fullstack`을 사용하면 아래 설정이 자동으로 적용됩니다.
+
+### Team 템플릿 복사
+
+```bash
+# Fullstack 프로젝트 루트에서 실행
+STANDARDS_PATH="../dev-standards"
+
+# Team Lead 템플릿 (양쪽 프로젝트에 복사)
+cp $STANDARDS_PATH/templates/claude-teams/fullstack-team.md frontend/.claude/agents/
+cp $STANDARDS_PATH/templates/claude-teams/fullstack-team.md backend/.claude/agents/
+
+# Frontend에 Backend Agent 추가 (Team이 사용)
+cp $STANDARDS_PATH/templates/claude-agents/fastapi-specialist.md frontend/.claude/agents/
+cp $STANDARDS_PATH/templates/claude-agents/sql-query-specialist.md frontend/.claude/agents/
+cp $STANDARDS_PATH/templates/claude-agents/api-test-specialist.md frontend/.claude/agents/
+
+# Backend에 Frontend Agent 추가 (Team이 사용)
+cp $STANDARDS_PATH/templates/claude-agents/react-specialist.md backend/.claude/agents/
+cp $STANDARDS_PATH/templates/claude-agents/e2e-test-specialist.md backend/.claude/agents/
+cp $STANDARDS_PATH/templates/claude-agents/code-quality-reviewer.md backend/.claude/agents/
+```
+
+### 왜 양쪽에 모든 Agent가 필요한가?
+
+Fullstack Team은 하나의 프로젝트에서 실행되지만, Backend와 Frontend Agent를 모두 Teammate로 생성합니다. Team Lead가 Agent 템플릿을 참조하여 Teammate에게 지시하므로, 실행하는 프로젝트에 모든 Agent 템플릿이 있어야 합니다.
+
+### Team 사용
+
+```bash
+# Frontend 또는 Backend 디렉토리에서
+@fullstack-team 매출 목록 페이지 구현
+
+# 상세 요청
+@fullstack-team 매출 관리 기능 구현
+- 목록 조회: 검색, 필터링, 정렬, 페이지네이션
+- CRUD: 등록/수정/삭제
+- AG-Grid 테이블
+```
+
+자세한 사용법은 [Fullstack Team Guide](fullstack-team-guide.md) 참조
+
+---
+
 ## 4. 새 도메인 추가하기
 
 ### 3.1 Frontend 도메인 추가
@@ -522,6 +570,10 @@ app.include_router(users_router)
   - [ ] `nginx/` 디렉토리 구조 복사
   - [ ] `Dockerfile`, `Dockerfile.dev` 복사
   - [ ] `docker-compose.yml` 복사 및 수정
+- [ ] **PRD 설정**
+  - [ ] PRD 템플릿 복사 확인 (`docs/prd/`)
+  - [ ] 공통 PRD 작성 (`docs/prd/common/common.md`)
+  - [ ] PRD 인덱스 프로젝트명 수정 (`docs/prd/index.md`)
 - [ ] CLAUDE.md 생성 및 수정
 - [ ] package.json 스크립트 추가
 - [ ] lint/format 실행 확인
@@ -538,9 +590,21 @@ app.include_router(users_router)
   - [ ] `.claude/settings.json` 복사
   - [ ] `.claude/scripts/check-env.sh` 복사 및 실행 권한 부여
   - [ ] `.python-version` 파일 생성
+- [ ] **PRD 설정**
+  - [ ] PRD 템플릿 복사 확인 (`docs/prd/`)
+  - [ ] 공통 PRD 작성 (`docs/prd/common/common.md`)
+  - [ ] PRD 인덱스 프로젝트명 수정 (`docs/prd/index.md`)
 - [ ] CLAUDE.md 생성 및 수정
 - [ ] .env.example 생성
 - [ ] ruff/mypy 실행 확인
+
+### Fullstack Team 설정 체크리스트 (Fullstack 프로젝트 추가)
+- [ ] Team Lead 템플릿 복사 (`fullstack-team.md` → 양쪽 `.claude/agents/`)
+- [ ] Frontend에 Backend Agent 추가 (fastapi, sql-query, api-test)
+- [ ] Backend에 Frontend Agent 추가 (react, e2e-test, code-quality)
+- [ ] Fullstack Team Guide 복사 (`docs/standards/`)
+- [ ] CLAUDE.md에 Team 섹션 추가
+- [ ] `@fullstack-team` 호출 테스트
 
 ---
 

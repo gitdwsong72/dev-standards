@@ -137,22 +137,110 @@ Closes #234
 
 ---
 
-## Commit Lint 설정
+## Commitlint 자동 검증
+
+커밋 메시지는 commitlint를 통해 자동으로 검증됩니다. `create-project.sh`로 생성한 프로젝트에는 이미 설정이 포함되어 있습니다.
+
+### Frontend 프로젝트 (pnpm + husky)
+
+```bash
+# 의존성 설치 시 husky가 자동 초기화됩니다
+pnpm install
+
+# 이후 모든 커밋에서 자동 검증
+git commit -m "feat(user): add login page"  # ✓ 통과
+git commit -m "Add login page"              # ✗ 실패
+```
+
+**자동 설정 내용:**
+- `@commitlint/cli`, `@commitlint/config-conventional`, `husky` devDependencies 포함
+- `commitlint.config.js` 설정 파일 포함
+- `.husky/commit-msg` hook 설정 완료
+- `pnpm install` 시 `prepare` 스크립트로 husky 자동 초기화
+
+### Backend 프로젝트 (Python + git hooks)
+
+```bash
+# 최초 1회 실행
+./scripts/setup-commitlint.sh
+
+# 이후 모든 커밋에서 자동 검증
+git commit -m "feat(user): add login endpoint"  # ✓ 통과
+git commit -m "fixed bug"                       # ✗ 실패
+```
+
+**자동 설정 내용:**
+- `commitlint.config.js` 설정 파일 포함
+- `.githooks/commit-msg` hook 설정 완료
+- `scripts/setup-commitlint.sh` 실행으로 git hooks 경로 연결
+
+### 수동 설정 (기존 프로젝트)
+
+기존 프로젝트에 commitlint를 추가하려면:
+
+```bash
+# 1. 템플릿 복사
+cp dev-standards/templates/git/commitlint.config.js ./
+
+# 2-a. Frontend (pnpm + husky)
+pnpm add -D @commitlint/cli @commitlint/config-conventional husky
+npx husky init
+cp dev-standards/templates/git/commit-msg-hook.sh .husky/commit-msg
+chmod +x .husky/commit-msg
+
+# 2-b. Backend (git hooks 직접 설정)
+mkdir -p .githooks
+cp dev-standards/templates/git/commit-msg-hook.sh .githooks/commit-msg
+chmod +x .githooks/commit-msg
+git config core.hooksPath .githooks
+```
+
+### 검증 규칙
+
+| 규칙 | 수준 | 설명 |
+|------|------|------|
+| `type-enum` | error | 허용된 type만 사용 가능 |
+| `type-case` | error | type은 소문자 |
+| `type-empty` | error | type은 필수 |
+| `scope-case` | error | scope은 소문자 |
+| `subject-case` | error | subject는 소문자로 시작 |
+| `subject-empty` | error | subject는 필수 |
+| `subject-max-length` | error | subject 50자 이내 |
+| `subject-full-stop` | error | subject 끝에 마침표 금지 |
+| `header-max-length` | error | header 전체 72자 이내 |
+| `body-max-line-length` | error | body 줄당 72자 이내 |
+
+### 검증 실패 시 에러 메시지 예시
+
+```
+⧗   input: Add new feature
+✖   subject may not be empty [subject-empty]
+✖   type may not be empty [type-empty]
+
+✖   found 2 problems, 0 warnings
+
+ⓘ   올바른 형식: type(scope): subject
+ⓘ   예시: feat(user): add login page
+```
+
+### 설정 파일
 
 ```javascript
 // commitlint.config.js
-module.exports = {
+export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
     'type-enum': [
-      2,
-      'always',
-      ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'chore', 'ci', 'revert']
+      2, 'always',
+      ['feat', 'fix', 'docs', 'style', 'refactor',
+       'perf', 'test', 'chore', 'ci', 'revert']
     ],
     'scope-case': [2, 'always', 'lower-case'],
     'subject-case': [2, 'always', 'lower-case'],
     'subject-max-length': [2, 'always', 50],
-    'body-max-line-length': [2, 'always', 72]
-  }
+    'subject-full-stop': [2, 'never', '.'],
+    'header-max-length': [2, 'always', 72],
+    'body-max-line-length': [2, 'always', 72],
+  },
 };
 ```

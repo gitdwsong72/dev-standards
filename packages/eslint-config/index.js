@@ -21,7 +21,7 @@ export default [
       sourceType: 'module',
       globals: {
         ...globals.node,
-        ...globals.es2021,
+        ...globals.es2024,
       },
     },
     rules: {
@@ -62,7 +62,7 @@ export default [
       'security/detect-non-literal-fs-filename': 'warn',
       'security/detect-non-literal-regexp': 'warn',
       'security/detect-non-literal-require': 'warn',
-      'security/detect-object-injection': 'warn',
+      'security/detect-object-injection': 'off', // 과도한 false positive, 실용성 낮음
       'security/detect-possible-timing-attacks': 'warn',
       'security/detect-pseudoRandomBytes': 'error',
       'security/detect-child-process': 'warn',

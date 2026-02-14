@@ -22,6 +22,8 @@ select = [
     "RUF",    # ruff-specific rules
     "ASYNC",  # flake8-async
     "S",      # flake8-bandit (security)
+    "T20",    # flake8-print (프로덕션 코드에서 print 방지)
+    "DTZ",    # flake8-datetimez (timezone-aware datetime 강제)
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)

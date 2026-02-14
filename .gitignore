@@ -11,9 +11,20 @@ build/
 .venv/
 venv/
 
+# Python 테스트 및 캐시
+.coverage
+.pytest_cache/
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+
 # IDE
 .idea/
-.vscode/
+.vscode/settings.json
+.vscode/*.log
+.fleet/
 *.swp
 *.swo
 *~

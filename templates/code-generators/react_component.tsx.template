@@ -1,0 +1,16 @@
+import {{ type ReactNode }} from 'react';
+
+interface {name}Props {{
+  children?: ReactNode;
+  // Add props here
+}}
+
+export function {name}({{ children }}: {name}Props) {{
+  return (
+    <div className="{name_lower}">
+      {{children ?? '{name} Component'}}
+    </div>
+  );
+}}
+
+export default {name};

@@ -38,6 +38,8 @@ PROJECT_TYPE="fullstack"
 TARGET_DIR="$(pwd)"
 FRONTEND_DIR=""
 BACKEND_DIR=""
+PROJECT_WITH_SKILLS=false
+PROJECT_WITH_GENERATORS=false
 
 #######################################
 # 유틸리티 함수
@@ -82,6 +84,8 @@ show_help() {
     echo "  -d, --dir <path>         생성 경로 (기본: 현재 디렉토리)"
     echo "  -f, --frontend <name>    Frontend 디렉토리 이름 (fullstack용, 기본: {name}-frontend)"
     echo "  -b, --backend <name>     Backend 디렉토리 이름 (fullstack용, 기본: {name}-backend)"
+    echo "  --with-skills            Claude Skills 포함 (manage-skills, verify-implementation)"
+    echo "  --with-generators        Code Generators 포함 (API, 컴포넌트, 테스트 생성기)"
     echo "  -h, --help               이 도움말 표시"
     echo ""
     echo "예시:"
@@ -117,6 +121,14 @@ while [[ $# -gt 0 ]]; do
         -b|--backend)
             BACKEND_DIR="$2"
             shift 2
+            ;;
+        --with-skills)
+            PROJECT_WITH_SKILLS=true
+            shift
+            ;;
+        --with-generators)
+            PROJECT_WITH_GENERATORS=true
+            shift
             ;;
         -h|--help)
             show_help
@@ -205,6 +217,21 @@ interactive_input() {
         fi
         TARGET_DIR="$custom_dir"
     fi
+
+    # 추가 기능 선택
+    echo ""
+    echo -e "${YELLOW}추가 기능을 선택하세요 (Enter로 건너뛰기):${NC}"
+    echo "  1) Claude Skills (검증 스킬 자동 관리)"
+    echo "  2) Code Generators (코드 생성 도구)"
+    echo "  3) 둘 다"
+    echo ""
+    read -p "선택 [1/2/3, Enter=건너뛰기]: " addon_choice
+    case $addon_choice in
+        1) PROJECT_WITH_SKILLS=true ;;
+        2) PROJECT_WITH_GENERATORS=true ;;
+        3) PROJECT_WITH_SKILLS=true; PROJECT_WITH_GENERATORS=true ;;
+        *) ;;  # 건너뛰기
+    esac
 }
 
 #######################################
@@ -1009,6 +1036,25 @@ EOF
     # Commitlint + Husky 설정
     setup_commitlint "$project_path" "pnpm"
 
+    # Claude Skills 복사
+    if [ "$PROJECT_WITH_SKILLS" = true ]; then
+        print_step "Claude Skills 복사..."
+        mkdir -p .claude/skills
+        cp -r "$STANDARDS_PATH/templates/claude-skills/manage-skills" .claude/skills/
+        cp -r "$STANDARDS_PATH/templates/claude-skills/verify-implementation" .claude/skills/
+        cp -r "$STANDARDS_PATH/templates/claude-skills/dev-toolkit" .claude/skills/
+    fi
+
+    # Code Generators 복사
+    if [ "$PROJECT_WITH_GENERATORS" = true ]; then
+        print_step "Code Generators 복사..."
+        mkdir -p scripts/generators
+        cp "$STANDARDS_PATH/scripts/generators/"*.py scripts/generators/
+        cp "$STANDARDS_PATH/scripts/generators/__init__.py" scripts/generators/ 2>/dev/null || touch scripts/generators/__init__.py
+        mkdir -p templates/code-generators
+        cp "$STANDARDS_PATH/templates/code-generators/"* templates/code-generators/
+    fi
+
     print_success "Frontend 프로젝트 생성 완료: $project_path"
 }
 
@@ -1682,6 +1728,25 @@ EOF
 
     # Commitlint 설정
     setup_commitlint "$project_path" "uv"
+
+    # Claude Skills 복사
+    if [ "$PROJECT_WITH_SKILLS" = true ]; then
+        print_step "Claude Skills 복사..."
+        mkdir -p .claude/skills
+        cp -r "$STANDARDS_PATH/templates/claude-skills/manage-skills" .claude/skills/
+        cp -r "$STANDARDS_PATH/templates/claude-skills/verify-implementation" .claude/skills/
+        cp -r "$STANDARDS_PATH/templates/claude-skills/dev-toolkit" .claude/skills/
+    fi
+
+    # Code Generators 복사
+    if [ "$PROJECT_WITH_GENERATORS" = true ]; then
+        print_step "Code Generators 복사..."
+        mkdir -p scripts/generators
+        cp "$STANDARDS_PATH/scripts/generators/"*.py scripts/generators/
+        cp "$STANDARDS_PATH/scripts/generators/__init__.py" scripts/generators/ 2>/dev/null || touch scripts/generators/__init__.py
+        mkdir -p templates/code-generators
+        cp "$STANDARDS_PATH/templates/code-generators/"* templates/code-generators/
+    fi
 
     print_success "Backend 프로젝트 생성 완료: $project_path"
 }

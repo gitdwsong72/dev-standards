@@ -1,0 +1,21 @@
+  describe('{func_name}', () => {{
+    it('should return expected result with valid input', () => {{
+      // Arrange
+      // TODO: Set up test data using mockData
+
+      // Act
+      const result = {func_name}();
+
+      // Assert
+      expect(result).toBeDefined();  // TODO: Add proper assertions
+    }});
+
+    it('should handle edge cases', () => {{
+      // Arrange
+      // TODO: Set up edge case data (empty, null, boundary values)
+
+      // Act & Assert
+      // TODO: Test edge cases (e.g., expect(...).toThrow(), empty results)
+      expect(true).toBe(true);
+    }});
+  }});

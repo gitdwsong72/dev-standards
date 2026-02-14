@@ -1,0 +1,19 @@
+    def test_{func_name}_success(self, sample_data):
+        """Test {func_name} with valid input."""
+        # Arrange
+        # TODO: Set up test data using sample_data
+
+        # Act
+        result = {func_name}()
+
+        # Assert
+        assert result is not None  # TODO: Add proper assertions
+
+    def test_{func_name}_edge_case(self):
+        """Test {func_name} with edge case input."""
+        # Arrange
+        # TODO: Set up edge case data (empty, None, boundary values)
+
+        # Act & Assert
+        # TODO: Test edge cases (e.g., pytest.raises, empty results)
+        pass

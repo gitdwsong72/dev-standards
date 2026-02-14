@@ -1,0 +1,20 @@
+import {{ render, screen }} from '@testing-library/react';
+import {{ {name} }} from './{name}';
+
+describe('{name}', () => {{
+  it('renders without crashing', () => {{
+    render(<{name} />);
+    expect(screen.getByText('{name} Component')).toBeInTheDocument();
+  }});
+
+  it('has correct className', () => {{
+    const {{ container }} = render(<{name} />);
+    expect(container.querySelector('.{name_lower}')).toBeInTheDocument();
+  }});
+
+  it('renders children when provided', () => {{
+    render(<{name}>Hello World</{name}>);
+    expect(screen.getByText('Hello World')).toBeInTheDocument();
+    expect(screen.queryByText('{name} Component')).not.toBeInTheDocument();
+  }});
+}});

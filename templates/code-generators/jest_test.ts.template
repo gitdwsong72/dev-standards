@@ -1,0 +1,10 @@
+import {{ {functions} }} from './{module}';
+
+const mockData = {{
+  // TODO: Define shared test data
+  name: 'test_value',
+}};
+
+describe('{class_name}', () => {{
+{test_cases}
+}});

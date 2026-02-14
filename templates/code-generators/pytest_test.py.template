@@ -1,0 +1,17 @@
+import pytest
+from {module} import {functions}
+
+
+@pytest.fixture
+def sample_data():
+    """Shared test data for {module}."""
+    return {{
+        # TODO: Define test data
+        "name": "test_value",
+    }}
+
+
+class Test{class_name}:
+    """Test cases for {module}."""
+
+{test_methods}

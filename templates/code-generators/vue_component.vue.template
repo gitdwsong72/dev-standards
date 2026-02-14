@@ -1,0 +1,24 @@
+<template>
+  <div class="{name_lower}">
+    <slot>{name} Component</slot>
+  </div>
+</template>
+
+<script setup lang="ts">
+interface Props {{
+  // Define props here
+}}
+
+const props = defineProps<Props>();
+
+const emit = defineEmits<{{
+  // Define events here, e.g.:
+  // (e: 'update', value: string): void
+}}>();
+</script>
+
+<style scoped>
+.{name_lower} {{
+  /* Add styles here */
+}}
+</style>

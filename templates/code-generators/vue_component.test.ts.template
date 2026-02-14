@@ -1,0 +1,15 @@
+import {{ mount }} from '@vue/test-utils';
+import {{ describe, it, expect }} from 'vitest';
+import {name} from './{name}.vue';
+
+describe('{name}', () => {{
+  it('renders without crashing', () => {{
+    const wrapper = mount({name});
+    expect(wrapper.text()).toContain('{name} Component');
+  }});
+
+  it('has correct className', () => {{
+    const wrapper = mount({name});
+    expect(wrapper.classes()).toContain('{name_lower}');
+  }});
+}});

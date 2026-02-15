@@ -14,7 +14,7 @@ setup_commitlint() {
 
     print_step "Commitlint + Husky 설정..."
 
-    cd "$project_path"
+    cd "$project_path" || return 1
 
     if [ "$pkg_manager" == "pnpm" ]; then
         # Frontend (Node.js) 프로젝트

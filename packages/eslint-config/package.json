@@ -44,5 +44,8 @@
     "eslint-plugin-security": "^3.0.0",
     "globals": "^15.0.0"
   },
+  "scripts": {
+    "test": "node --test index.test.js"
+  },
   "license": "MIT"
 }

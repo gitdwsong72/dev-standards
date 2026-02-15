@@ -60,7 +60,83 @@ pnpm eslint --print-config src/App.tsx | grep -i "indent\|semi\|quote"
 
 ---
 
-## 2. TypeScript 설정 관련
+## 2. Prettier 설정 관련
+
+### 2.1 Prettier와 에디터 설정 충돌
+
+**증상:** 저장 시 포맷이 원래대로 돌아가거나, 에디터의 포맷팅과 Prettier 결과가 다름
+
+**원인:** VS Code의 기본 포맷터와 Prettier 확장이 충돌
+
+**해결:**
+```json
+// .vscode/settings.json
+{
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}
+```
+
+### 2.2 "Cannot find module '@company/prettier-config'" 오류
+
+**증상:**
+```
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@company/prettier-config'
+```
+
+**원인:** 패키지가 설치되지 않았거나, prettier.config.js의 import 경로가 잘못됨
+
+**해결:**
+```bash
+# 패키지 설치 확인
+pnpm ls @company/prettier-config
+
+# 재설치
+pnpm add -D @company/prettier-config
+
+# prettier.config.js 확인
+cat prettier.config.js
+# import config from '@company/prettier-config';
+# export default config;
+```
+
+### 2.3 Prettier가 특정 파일을 무시하지 않음
+
+**증상:** `dist/`, `build/`, `node_modules/` 등 빌드 산출물이 포맷팅됨
+
+**원인:** `.prettierignore` 파일이 없거나 설정이 불완전
+
+**해결:**
+```bash
+# .prettierignore 생성
+cat > .prettierignore << 'EOF'
+node_modules/
+dist/
+build/
+coverage/
+*.min.js
+*.min.css
+pnpm-lock.yaml
+EOF
+```
+
+```bash
+# 특정 경로만 포맷팅
+pnpm prettier --write "src/**/*.{ts,tsx}"
+
+# 전체 확인 (ignore 적용)
+pnpm prettier --check .
+```
+
+---
+
+## 3. TypeScript 설정 관련
 
 ### 2.1 Path Alias가 작동하지 않음
 
@@ -125,9 +201,9 @@ import { someFunction, type SomeType } from './module';
 
 ---
 
-## 3. Python/Backend 관련
+## 4. Python/Backend 관련
 
-### 3.1 uv가 설치되어 있지 않음
+### 4.1 uv가 설치되어 있지 않음
 
 **증상:**
 ```
@@ -146,7 +222,7 @@ pip install uv
 source ~/.zshrc  # 또는 source ~/.bashrc
 ```
 
-### 3.2 asyncpg 연결 오류
+### 4.2 asyncpg 연결 오류
 
 **증상:**
 ```
@@ -168,7 +244,7 @@ cat .env
 # DB_PRIMARY_DB_URL=postgresql://devuser:devpassword@localhost:5432/appdb
 ```
 
-### 3.3 Ruff 설정 상속 오류
+### 4.3 Ruff 설정 상속 오류
 
 **증상:**
 ```
@@ -188,11 +264,112 @@ extend = "./path/to/company_standards/ruff.toml"
 python -c "import company_standards; print(company_standards.__path__)"
 ```
 
+### 4.4 mypy "Module has no attribute" 오류
+
+**증상:**
+```
+error: Module "fastapi" has no attribute "Query"  [attr-defined]
+```
+
+**원인:** mypy 타입 스텁이 설치되지 않았거나 버전 불일치
+
+**해결:**
+```bash
+# 타입 스텁 설치
+uv pip install types-requests types-redis types-pyyaml
+
+# mypy 캐시 초기화
+rm -rf .mypy_cache
+mypy src/
+
+# 서드파티 라이브러리 무시 (임시 조치)
+# pyproject.toml
+# [[tool.mypy.overrides]]
+# module = ["some_untyped_library.*"]
+# ignore_missing_imports = true
+```
+
+### 4.5 Ruff와 기존 Black/isort 설정 충돌
+
+**증상:** `ruff format`과 `black`이 서로 다른 포맷을 적용하여 파일이 계속 변경됨
+
+**원인:** Ruff와 Black/isort가 동시에 설정되어 있음
+
+**해결:**
+```bash
+# 기존 도구 제거 (Ruff가 대체)
+uv pip uninstall black isort flake8
+
+# 기존 설정 파일 삭제
+rm -f .flake8 .isort.cfg .black.toml
+
+# pyproject.toml에서 [tool.black], [tool.isort] 섹션 제거
+# Ruff가 모든 기능을 대체합니다
+
+# 확인
+ruff check src/     # lint (flake8 + isort 대체)
+ruff format src/    # format (black 대체)
+```
+
+### 4.6 Python 가상환경 관련 오류
+
+**증상:**
+```
+ModuleNotFoundError: No module named 'company_standards'
+```
+
+**원인:** 가상환경이 활성화되지 않았거나, 다른 가상환경에 패키지가 설치됨
+
+**해결:**
+```bash
+# 현재 Python 경로 확인
+which python
+# /Users/you/.venv/bin/python 이어야 함
+
+# 가상환경 생성 및 활성화
+uv venv
+source .venv/bin/activate
+
+# 패키지 재설치
+uv pip install company-python-standards
+
+# VS Code에서 Python 인터프리터 선택
+# Cmd+Shift+P → "Python: Select Interpreter" → .venv 선택
+```
+
+### 4.7 pytest 설정 상속 오류
+
+**증상:**
+```
+ERRORS: could not load conftest.py
+```
+
+**원인:** `conftest.py` 경로 또는 `pyproject.toml`의 pytest 설정이 잘못됨
+
+**해결:**
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+```
+
+```bash
+# conftest.py가 프로젝트 루트에 있는지 확인
+ls conftest.py tests/conftest.py
+
+# pytest 실행 (상세 출력)
+pytest -v --tb=short
+```
+
 ---
 
-## 4. Docker 관련
+## 5. Docker 관련
 
-### 4.1 Frontend 빌드 시 node_modules 볼륨 충돌
+### 5.1 Frontend 빌드 시 node_modules 볼륨 충돌
 
 **증상:** Docker에서 `pnpm install` 후에도 모듈을 찾지 못함
 
@@ -209,7 +386,7 @@ services:
       - /app/node_modules        # 익명 볼륨으로 격리
 ```
 
-### 4.2 Backend DB 연결 실패 (docker-compose)
+### 5.2 Backend DB 연결 실패 (docker-compose)
 
 **증상:**
 ```
@@ -233,9 +410,9 @@ depends_on:
 
 ---
 
-## 5. Git 워크플로우 관련
+## 6. Git 워크플로우 관련
 
-### 5.1 master에 실수로 push한 경우
+### 6.1 master에 실수로 push한 경우
 
 **증상:**
 ```
@@ -261,7 +438,7 @@ cp templates/git/pre-push .git/hooks/pre-push
 chmod +x .git/hooks/pre-push
 ```
 
-### 5.2 rebase 중 충돌 해결
+### 6.2 rebase 중 충돌 해결
 
 **증상:** `git rebase origin/master` 중 충돌 발생
 
@@ -285,7 +462,7 @@ git rebase --abort
 git push --force-with-lease
 ```
 
-### 5.3 커밋 메시지 컨벤션 오류
+### 6.3 커밋 메시지 컨벤션 오류
 
 **증상:** commitlint 검사 실패
 
@@ -305,9 +482,9 @@ git commit --amend -m "feat(user): add login page"
 
 ---
 
-## 6. Claude Code Agent 관련
+## 7. Claude Code Agent 관련
 
-### 6.1 Agent 템플릿을 찾을 수 없음
+### 7.1 Agent 템플릿을 찾을 수 없음
 
 **증상:** `@react-specialist` 호출 시 Agent를 인식하지 못함
 
@@ -329,7 +506,7 @@ cp path/to/dev-standards/templates/claude-agents/sql-query-specialist.md .claude
 # 또는 create-project.sh로 새 프로젝트 생성 시 자동 포함
 ```
 
-### 6.2 Fullstack Team이 정상 작동하지 않음
+### 7.2 Fullstack Team이 정상 작동하지 않음
 
 **증상:** Team 실행 시 일부 Agent가 실행되지 않음
 
@@ -349,9 +526,9 @@ ls .claude/agents/
 
 ---
 
-## 7. create-project.sh 관련
+## 8. create-project.sh 관련
 
-### 7.1 스크립트 실행 권한 오류
+### 8.1 스크립트 실행 권한 오류
 
 **증상:**
 ```
@@ -364,7 +541,7 @@ chmod +x scripts/create-project.sh
 ./scripts/create-project.sh
 ```
 
-### 7.2 프로젝트 이름 검증 실패
+### 8.2 프로젝트 이름 검증 실패
 
 **증상:**
 ```

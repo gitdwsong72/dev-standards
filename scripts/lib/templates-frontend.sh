@@ -18,7 +18,7 @@ create_frontend() {
     # 디렉토리 생성
     print_step "디렉토리 생성..."
     mkdir -p "$project_path"
-    cd "$project_path"
+    cd "$project_path" || return 1
 
     # Vite 프로젝트 초기화 (package.json만 생성)
     print_step "Vite + React + TypeScript 초기화..."

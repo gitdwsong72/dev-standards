@@ -80,6 +80,49 @@ jobs:
             }
           "
 
+  test-npm-packages:
+    name: Test - ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    needs: [lint-packages]
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - eslint-config
+          - prettier-config
+          - typescript-config
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-${{ matrix.package }}-${{ hashFiles(format('packages/{0}/package.json', matrix.package)) }}
+          restore-keys: |
+            pnpm-${{ matrix.package }}-
+
+      - name: Install dependencies
+        working-directory: packages/${{ matrix.package }}
+        run: pnpm install
+
+      - name: Run tests
+        working-directory: packages/${{ matrix.package }}
+        run: pnpm test
+
   test-python:
     name: Python Standards
     runs-on: ubuntu-latest
@@ -129,6 +172,87 @@ jobs:
           config = tomllib.loads(Path('src/company_standards/ruff.toml').read_text())
           print('Ruff config validated:', list(config.keys()))
           "
+
+  coverage-report:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: [test-python]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-3.12-${{ hashFiles('packages/python-standards/pyproject.toml') }}
+          restore-keys: |
+            uv-3.12-
+
+      - name: Install dependencies
+        working-directory: packages/python-standards
+        run: uv pip install --system -e ".[dev]" pytest-cov
+
+      - name: Run tests with coverage
+        working-directory: packages/python-standards
+        run: |
+          pytest tests/ \
+            --cov=src \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing \
+            --cov-fail-under=60 \
+            -v --tb=short || true
+
+      - name: Upload coverage XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage
+          path: packages/python-standards/coverage.xml
+          retention-days: 30
+
+      - name: Coverage summary
+        if: always()
+        working-directory: packages/python-standards
+        run: |
+          echo "## Python Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ ! -f coverage.xml ]; then
+            echo "⚠️ No coverage.xml found" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          # Parse coverage from XML
+          COVERAGE=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('coverage.xml')
+          root = tree.getroot()
+          rate = float(root.attrib.get('line-rate', 0))
+          print(f'{rate * 100:.1f}')
+          ")
+
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Line Coverage | ${COVERAGE}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Threshold | 60% |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Enforce 60% threshold
+          PASS=$(python3 -c "print('true' if float('${COVERAGE}') >= 60.0 else 'false')")
+          if [ "$PASS" = "true" ]; then
+            echo "✅ Coverage meets the 60% threshold" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Coverage ${COVERAGE}% is below the 60% threshold" >> $GITHUB_STEP_SUMMARY
+            echo "::error::Coverage ${COVERAGE}% is below the required 60% threshold"
+            exit 1
+          fi
 
   test-create-script:
     name: Create Script Validation
@@ -210,18 +334,128 @@ jobs:
             fi
           done
 
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: |
+          chmod +x scripts/lint-bash.sh
+          ./scripts/lint-bash.sh --ci
+
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install radon
+        run: pip install radon
+
+      - name: Run complexity analysis
+        run: |
+          chmod +x scripts/check-complexity.sh
+          ./scripts/check-complexity.sh --ci
+
+  bundle-size:
+    name: Bundle Size Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Measure tarball sizes
+        id: sizes
+        run: |
+          THRESHOLD=512000  # 500KB in bytes
+          FAILED=0
+
+          echo "## Bundle Size Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Package | Tarball Size | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          for pkg_dir in packages/eslint-config packages/prettier-config packages/typescript-config; do
+            pkg_name=$(node -e "console.log(require('./${pkg_dir}/package.json').name)")
+
+            # Install dependencies for accurate pack
+            cd "$pkg_dir"
+            pnpm install
+            cd "$GITHUB_WORKSPACE"
+
+            # Create tarball and measure size
+            tarball=$(cd "$pkg_dir" && pnpm pack 2>/dev/null | tail -1)
+            size_bytes=$(wc -c < "${pkg_dir}/${tarball}" | tr -d ' ')
+            size_kb=$((size_bytes / 1024))
+
+            # Clean up tarball
+            rm -f "${pkg_dir}/${tarball}"
+
+            if [ "$size_bytes" -gt "$THRESHOLD" ]; then
+              echo "| ${pkg_name} | ${size_kb}KB | ❌ OVER (>${THRESHOLD}B) |" >> $GITHUB_STEP_SUMMARY
+              echo "::error::${pkg_name} tarball size ${size_kb}KB exceeds 500KB threshold"
+              FAILED=1
+            else
+              echo "| ${pkg_name} | ${size_kb}KB | ✅ OK |" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "${pkg_name}: ${size_kb}KB"
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Threshold:** 500KB per package" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
+
+  benchmark:
+    name: Script Benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run benchmarks
+        run: |
+          chmod +x scripts/benchmark-create-project.sh
+          chmod +x scripts/create-project.sh
+          THRESHOLD=30 ./scripts/benchmark-create-project.sh
+
   ci-status:
     name: CI Status
     runs-on: ubuntu-latest
-    needs: [lint-packages, test-python, test-create-script, template-validation]
+    needs: [lint-packages, test-npm-packages, test-python, coverage-report, test-create-script, template-validation, shellcheck, code-quality, bundle-size, benchmark]
     if: always()
     steps:
       - name: Check all jobs
         run: |
           if [[ "${{ needs.lint-packages.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-npm-packages.result }}" == "failure" ]] || \
              [[ "${{ needs.test-python.result }}" == "failure" ]] || \
+             [[ "${{ needs.coverage-report.result }}" == "failure" ]] || \
              [[ "${{ needs.test-create-script.result }}" == "failure" ]] || \
-             [[ "${{ needs.template-validation.result }}" == "failure" ]]; then
+             [[ "${{ needs.template-validation.result }}" == "failure" ]] || \
+             [[ "${{ needs.shellcheck.result }}" == "failure" ]] || \
+             [[ "${{ needs.code-quality.result }}" == "failure" ]] || \
+             [[ "${{ needs.bundle-size.result }}" == "failure" ]] || \
+             [[ "${{ needs.benchmark.result }}" == "failure" ]]; then
             echo "One or more jobs failed"
             exit 1
           fi

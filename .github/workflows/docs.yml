@@ -1,0 +1,73 @@
+name: Documentation
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - '**/*.md'
+      - '.github/workflows/docs.yml'
+      - '.github/markdown-link-check-config.json'
+      - '.markdownlint.json'
+  pull_request:
+    paths:
+      - '**/*.md'
+      - '.github/workflows/docs.yml'
+      - '.github/markdown-link-check-config.json'
+      - '.markdownlint.json'
+
+jobs:
+  link-check:
+    name: Check Broken Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find markdown files
+        id: find-md
+        run: |
+          files=$(find . -name '*.md' \
+            -not -path './node_modules/*' \
+            -not -path './.git/*' \
+            -not -path '*/htmlcov/*' \
+            -not -path '*/.pytest_cache/*' \
+            | sort)
+          echo "Found $(echo "$files" | wc -l) markdown files"
+          echo "$files"
+
+      - name: Check markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          config-file: '.github/markdown-link-check-config.json'
+          folder-path: '.'
+          file-extension: '.md'
+          check-modified-files-only: 'no'
+
+  markdown-lint:
+    name: Lint Markdown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: |
+            **/*.md
+            !node_modules/**
+            !**/htmlcov/**
+            !**/.pytest_cache/**
+
+  docs-status:
+    name: Docs Status
+    runs-on: ubuntu-latest
+    needs: [link-check, markdown-lint]
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.link-check.result }}" == "failure" ]] || \
+             [[ "${{ needs.markdown-lint.result }}" == "failure" ]]; then
+            echo "One or more documentation checks failed"
+            exit 1
+          fi
+          echo "All documentation checks passed"

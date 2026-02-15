@@ -1,0 +1,258 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      dry_run:
+        description: 'Dry run (no actual changes)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Bump Version & Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get current version
+        id: current
+        run: |
+          VERSION=$(node -p "require('./packages/eslint-config/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Calculate new version
+        id: new
+        run: |
+          CURRENT="${{ steps.current.outputs.version }}"
+          TYPE="${{ github.event.inputs.version_type }}"
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+          case "$TYPE" in
+            patch) PATCH=$((PATCH + 1)) ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+          esac
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Verify version sync
+        run: |
+          EXPECTED="${{ steps.current.outputs.version }}"
+          FAILED=false
+
+          for PKG in eslint-config prettier-config typescript-config; do
+            V=$(node -p "require('./packages/${PKG}/package.json').version")
+            if [ "$V" != "$EXPECTED" ]; then
+              echo "::error::packages/${PKG} has version ${V}, expected ${EXPECTED}"
+              FAILED=true
+            fi
+          done
+
+          PY_V=$(grep '^version' packages/python-standards/pyproject.toml | sed 's/.*"\([^"]*\)".*/\1/')
+          if [ "$PY_V" != "$EXPECTED" ]; then
+            echo "::error::python-standards has version ${PY_V}, expected ${EXPECTED}"
+            FAILED=true
+          fi
+
+          if [ "$FAILED" = true ]; then
+            echo "::error::Package versions are out of sync. Fix before releasing."
+            exit 1
+          fi
+
+          echo "All packages at version ${EXPECTED}"
+
+      - name: Update npm package versions
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          NEW_VERSION="${{ steps.new.outputs.version }}"
+          for PKG in eslint-config prettier-config typescript-config; do
+            node -e "
+              const fs = require('fs');
+              const path = './packages/${PKG}/package.json';
+              const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+              pkg.version = '${NEW_VERSION}';
+              fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+            "
+            echo "Updated packages/${PKG}/package.json -> ${NEW_VERSION}"
+          done
+
+      - name: Update Python package version
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          NEW_VERSION="${{ steps.new.outputs.version }}"
+          sed -i "s/^version = \"[^\"]*\"/version = \"${NEW_VERSION}\"/" packages/python-standards/pyproject.toml
+          echo "Updated packages/python-standards/pyproject.toml -> ${NEW_VERSION}"
+
+      - name: Generate CHANGELOG entries
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          NEW_VERSION="${{ steps.new.outputs.version }}"
+          TODAY=$(date +%Y-%m-%d)
+
+          # Get last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            LOG_RANGE="${LAST_TAG}..HEAD"
+          else
+            LOG_RANGE="HEAD"
+          fi
+
+          # Collect commits by category
+          FEATURES=""
+          FIXES=""
+          REFACTORS=""
+          OTHERS=""
+
+          while IFS= read -r LINE; do
+            [ -z "$LINE" ] && continue
+            case "$LINE" in
+              feat*)     FEATURES="${FEATURES}- ${LINE}\n" ;;
+              fix*)      FIXES="${FIXES}- ${LINE}\n" ;;
+              refactor*) REFACTORS="${REFACTORS}- ${LINE}\n" ;;
+              *)         OTHERS="${OTHERS}- ${LINE}\n" ;;
+            esac
+          done < <(git log --pretty=format:"%s" $LOG_RANGE 2>/dev/null || true)
+
+          # Build entry
+          ENTRY="## [${NEW_VERSION}] - ${TODAY}\n"
+          [ -n "$FEATURES" ]  && ENTRY="${ENTRY}\n### Added\n\n${FEATURES}"
+          [ -n "$FIXES" ]     && ENTRY="${ENTRY}\n### Fixed\n\n${FIXES}"
+          [ -n "$REFACTORS" ] && ENTRY="${ENTRY}\n### Changed\n\n${REFACTORS}"
+          [ -n "$OTHERS" ]    && ENTRY="${ENTRY}\n### Other\n\n${OTHERS}"
+
+          # Update per-package CHANGELOGs
+          for PKG in eslint-config prettier-config typescript-config; do
+            CHANGELOG="packages/${PKG}/CHANGELOG.md"
+            if [ -f "$CHANGELOG" ]; then
+              TMP=$(mktemp)
+              awk -v entry="$(echo -e "$ENTRY")" '
+                /^---$/ { print; print ""; print entry; next }
+                { print }
+              ' "$CHANGELOG" > "$TMP"
+              mv "$TMP" "$CHANGELOG"
+              echo "Updated ${CHANGELOG}"
+            fi
+          done
+
+          # Create/update root CHANGELOG
+          if [ ! -f "CHANGELOG.md" ]; then
+            cat > CHANGELOG.md <<HEADER
+          # Changelog - dev-standards
+
+          All notable changes to this project will be documented in this file.
+
+          This project follows [Semantic Versioning](https://semver.org/).
+
+          ---
+
+          HEADER
+          fi
+
+          TMP=$(mktemp)
+          awk -v entry="$(echo -e "$ENTRY")" '
+            /^---$/ { print; print ""; print entry; next }
+            { print }
+          ' CHANGELOG.md > "$TMP"
+          mv "$TMP" CHANGELOG.md
+
+          # Save entry for release notes
+          echo -e "$ENTRY" > /tmp/release_notes.md
+
+      - name: Dry run summary
+        if: github.event.inputs.dry_run == 'true'
+        run: |
+          echo "## Dry Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version type | ${{ github.event.inputs.version_type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Current version | ${{ steps.current.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| New version | ${{ steps.new.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Packages to update" >> $GITHUB_STEP_SUMMARY
+          echo "- \`@company/eslint-config\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`@company/prettier-config\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`@company/typescript-config\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`company-python-standards\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "No changes were made (dry run mode)." >> $GITHUB_STEP_SUMMARY
+
+      - name: Commit and tag
+        if: github.event.inputs.dry_run != 'true'
+        id: commit
+        run: |
+          NEW_VERSION="${{ steps.new.outputs.version }}"
+          TAG="v${NEW_VERSION}"
+
+          git add -A
+          git commit -m "chore(release): v${NEW_VERSION}
+
+          Bump all package versions to ${NEW_VERSION}
+
+          Packages updated:
+          - @company/eslint-config@${NEW_VERSION}
+          - @company/prettier-config@${NEW_VERSION}
+          - @company/typescript-config@${NEW_VERSION}
+          - company-python-standards==${NEW_VERSION}"
+
+          git tag -a "$TAG" -m "Release ${TAG}"
+          git push origin HEAD --tags
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: github.event.inputs.dry_run != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.commit.outputs.tag }}
+          name: Release ${{ steps.commit.outputs.tag }}
+          body_path: /tmp/release_notes.md
+          draft: false
+          prerelease: false
+
+      - name: Release summary
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          echo "## Release Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version type | ${{ github.event.inputs.version_type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Previous version | ${{ steps.current.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| New version | ${{ steps.new.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tag | ${{ steps.commit.outputs.tag }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Packages updated" >> $GITHUB_STEP_SUMMARY
+          echo "- \`@company/eslint-config@${{ steps.new.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`@company/prettier-config@${{ steps.new.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`@company/typescript-config@${{ steps.new.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`company-python-standards==${{ steps.new.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY

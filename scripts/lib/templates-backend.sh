@@ -18,7 +18,7 @@ create_backend() {
     # 디렉토리 생성
     print_step "디렉토리 생성..."
     mkdir -p "$project_path"
-    cd "$project_path"
+    cd "$project_path" || return 1
 
     # 디렉토리 구조 생성
     print_step "디렉토리 구조 생성..."

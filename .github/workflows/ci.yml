@@ -38,7 +38,7 @@ jobs:
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
       - name: Cache pnpm dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.STORE_PATH }}
           key: pnpm-${{ matrix.package }}-${{ hashFiles(format('packages/{0}/package.json', matrix.package)) }}
@@ -108,7 +108,7 @@ jobs:
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
       - name: Cache pnpm dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.STORE_PATH }}
           key: pnpm-${{ matrix.package }}-${{ hashFiles(format('packages/{0}/package.json', matrix.package)) }}
@@ -140,7 +140,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Cache uv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/uv
           key: uv-${{ matrix.python-version }}-${{ hashFiles('packages/python-standards/pyproject.toml') }}
@@ -188,7 +188,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Cache uv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/uv
           key: uv-3.12-${{ hashFiles('packages/python-standards/pyproject.toml') }}

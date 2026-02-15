@@ -40,7 +40,7 @@ run_benchmark() {
     local tmp_dir
 
     tmp_dir=$(mktemp -d)
-    trap "rm -rf '$tmp_dir'" RETURN
+    trap 'rm -rf "$tmp_dir"' RETURN
 
     echo -e "${CYAN}[BENCH]${NC} ${scenario} (type: ${project_type})..."
 

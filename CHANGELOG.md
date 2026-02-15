@@ -10,6 +10,11 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 ### Bug Fixes
 
 - **P0:** Correct return type handling in component generator tests
+- **shellcheck:** Resolve SC2064 and add missing scripts to lint
+
+### Documentation
+
+- **changelog:** Update CHANGELOG.md [skip ci]
 
 ### Features
 

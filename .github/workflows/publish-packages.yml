@@ -32,7 +32,7 @@ jobs:
       typescript-config: ${{ steps.changes.outputs.typescript-config }}
       python-standards: ${{ steps.changes.outputs.python-standards }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -89,7 +89,7 @@ jobs:
           CONDITION="${{ needs.detect-changes.outputs[matrix.condition] }}"
           echo "publish=$CONDITION" >> $GITHUB_OUTPUT
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         if: steps.should-publish.outputs.publish == 'true'
 
       - uses: actions/setup-node@v4
@@ -154,7 +154,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v5
         with:
